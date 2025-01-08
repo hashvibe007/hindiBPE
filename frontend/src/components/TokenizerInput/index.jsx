@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './styles.css';
 import TrainingProgress from '../TrainingProgress';
+import VocabularyGrowth from '../VocabularyGrowth';
 
 const TokenizerInput = () => {
     const [inputText, setInputText] = useState('');
@@ -8,6 +9,7 @@ const TokenizerInput = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [selectedToken, setSelectedToken] = useState(null);
+    const [trainingStats, setTrainingStats] = useState(null);
 
     const getTokenColor = (type) => {
         const colors = {
@@ -49,6 +51,20 @@ const TokenizerInput = () => {
         }
     };
 
+    const fetchTrainingStats = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/training-stats');
+            const data = await response.json();
+            setTrainingStats(data);
+        } catch (error) {
+            console.error('Error fetching training stats:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchTrainingStats();
+    }, []);
+
     const TokenTypeLegend = () => (
         <div className="token-type-legend">
             <div className="legend-item">
@@ -78,6 +94,9 @@ const TokenizerInput = () => {
         <div className="app-container">
             <div className="training-section">
                 <TrainingProgress />
+                {trainingStats && trainingStats.vocab_growth && (
+                    <VocabularyGrowth vocabGrowth={trainingStats.vocab_growth} />
+                )}
             </div>
             <div className="tokenizer-container">
                 <h1>Hindi BPE Tokenizer</h1>

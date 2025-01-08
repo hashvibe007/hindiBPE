@@ -92,4 +92,37 @@
     padding: 15px;
     background-color: #f8f9fa;
     border-radius: 8px;
+}
+
+.training-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #dc3545;
+}
+
+.training-status.active .status-indicator {
+    background: #28a745;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.progress-details {
+    margin-left: auto;
+    font-weight: bold;
 } 

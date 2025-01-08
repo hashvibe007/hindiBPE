@@ -1,3 +1,4 @@
+import asyncio
 from app.bpe_tokenizer import BPETokenizer
 import json
 from tqdm import tqdm
@@ -30,38 +31,15 @@ def load_sample_data(file_path: str, max_sentences: int = None) -> str:
     return "\n".join(sentences)
 
 
-def train_and_save_bpe(
-    text: str, vocab_size: int = 5000, output_file: str = "bpe_model.json"
-):
-    """Train BPE and save the model with progress tracking"""
-    # Initialize tokenizer
+async def train_and_save_bpe(text: str, vocab_size: int = 5000, manager=None):
     tokenizer = BPETokenizer(vocab_size=vocab_size)
-
     print("\nInitializing vocabulary...")
-    print(f"Initial vocabulary size: {tokenizer.initialize_vocab()}")
-    print("\nBase vocabulary composition:")
-    for key, value in tokenizer.base_vocab_stats.items():
-        print(f"  {key}: {value}")
+    tokenizer.initialize_vocab()
 
     print("\nStarting BPE training...")
-    progress = tokenizer.learn_bpe(text)
+    await tokenizer.learn_bpe(text, manager=manager)
 
-    # Print training summary
-    print("\nTraining Summary:")
-    print(f"Base vocabulary size: {len(tokenizer.BASE_VOCAB)}")
-    print(f"Learned vocabulary size: {len(tokenizer.learned_vocab)}")
-    print(f"Total vocabulary size: {len(tokenizer.vocab)}")
-    print(f"Total merge operations: {len(tokenizer.merge_history)}")
-
-    # Print some example merges
-    if tokenizer.merge_history:
-        print("\nExample merges:")
-        for merge in tokenizer.merge_history[:5]:
-            print(
-                f"  {' + '.join(merge['pair'])} → {merge['new_token']} (freq: {merge['frequency']})"
-            )
-
-    # Save model and merge operations
+    # Save final model
     model_data = {
         "vocab": list(tokenizer.vocab),
         "merges": {" ".join(k): v for k, v in tokenizer.merges.items()},
@@ -74,27 +52,18 @@ def train_and_save_bpe(
         },
     }
 
-    print(f"\nSaving model to {output_file}...")
-    with open(output_file, "w", encoding="utf-8") as f:
+    with open("bpe_model.json", "w", encoding="utf-8") as f:
         json.dump(model_data, f, ensure_ascii=False, indent=2)
 
-    print("Model saved successfully!")
     return tokenizer
 
 
-def main():
+async def main():
     # Load the larger dataset
-    text = load_sample_data(
-        "data/hindi_wiki_corpus.txt",  # Use the new larger dataset
-        max_sentences=10000,  # Limit to 10000 sentences if needed
-    )
+    text = load_sample_data("data/hindi_wiki_corpus.txt", max_sentences=10000)
 
     # Train BPE with larger vocabulary
-    tokenizer = train_and_save_bpe(
-        text,
-        vocab_size=10000,  # Increased vocabulary size
-        output_file="bpe_model_large.json",  # New model file for larger dataset
-    )
+    tokenizer = await train_and_save_bpe(text, vocab_size=10000, manager=None)
 
     # Show sample tokenization
     print("\nSample Tokenization:")
@@ -109,4 +78,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

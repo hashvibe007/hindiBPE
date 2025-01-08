@@ -1,0 +1,56 @@
+.vocab-growth {
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chart-container {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.custom-tooltip {
+    background: white;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.token-list {
+    margin-top: 20px;
+}
+
+.token-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.token-card {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #eee;
+}
+
+.token-text {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    font-family: 'Noto Sans Devanagari', sans-serif;
+}
+
+.token-details {
+    font-size: 14px;
+    color: #666;
+}
+
+.token-composition {
+    margin-top: 5px;
+    font-family: monospace;
+    font-size: 12px;
+} 

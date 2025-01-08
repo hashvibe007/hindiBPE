@@ -3,6 +3,8 @@ from typing import Dict, List, Tuple, Set
 import json
 from .hindi_tokenizer import HindiTokenizer  # Import the base class
 from tqdm import tqdm
+import os
+import time
 
 
 class BPETokenizer(HindiTokenizer):
@@ -36,9 +38,23 @@ class BPETokenizer(HindiTokenizer):
                 self.pair_frequencies[pair] += freq
         return pairs
 
-    def learn_bpe(self, text: str):
-        """Learn BPE merge operations with detailed tracking"""
-        initial_vocab_size = self.initialize_vocab()
+    async def learn_bpe(self, text: str, manager=None, resume_from: str = None):
+        """Learn BPE merge operations with real-time updates"""
+        if resume_from and os.path.exists(resume_from):
+            print(f"Resuming training from {resume_from}")
+            self.load_model(resume_from)
+            initial_vocab_size = len(self.vocab)
+        else:
+            initial_vocab_size = self.initialize_vocab()
+
+        # Track vocabulary growth details
+        self.vocab_growth = {
+            "tokens": [],
+            "frequencies": [],
+            "compositions": [],
+            "merge_steps": [],
+            "timestamps": [],
+        }
 
         # Track learning progress
         self.training_progress = {
@@ -62,8 +78,13 @@ class BPETokenizer(HindiTokenizer):
             len("".join(word.split())) * freq for word, freq in word_freqs.items()
         )
 
+        print(f"\nInitial State:")
+        print(f"Base vocabulary size: {len(self.BASE_VOCAB)}")
         print(f"Starting with {len(word_freqs)} unique words")
         print(f"Total characters: {original_char_count}")
+        print("\nVocabulary composition:")
+        for key, value in self.base_vocab_stats.items():
+            print(f"  {key}: {value}")
 
         with tqdm(
             total=self.vocab_size - initial_vocab_size, desc="Learning merges"
@@ -90,6 +111,27 @@ class BPETokenizer(HindiTokenizer):
                 # Add to learned vocabulary
                 self.learned_vocab.add(new_token)
 
+                # Print new token details
+                if num_merges % 100 == 0:  # Print every 100 merges
+                    print(f"\nMerge {num_merges + 1}:")
+                    print(f"New token: '{new_token}' (freq: {frequency})")
+                    print(f"Pair: '{best_pair[0][0]}' + '{best_pair[0][1]}'")
+                    print(f"Token composition: {' + '.join(list(new_token))}")
+                    print(f"Current vocab size: {len(self.vocab) + 1}")
+                    print(f"Learned tokens: {len(self.learned_vocab)}")
+                    print(f"Compression ratio: {compression_ratio:.2f}")
+
+                    # Show example usage
+                    example_words = []
+                    bigram = " ".join(best_pair[0])  # Fix: Define bigram here
+                    for word, freq in word_freqs.items():
+                        if bigram in word:
+                            example_words.append(word.replace(" ", ""))
+                            if len(example_words) >= 3:
+                                break
+                    if example_words:
+                        print("Example words:", ", ".join(example_words))
+
                 # Update progress metrics
                 self.training_progress["metrics"]["vocab_sizes"].append(
                     len(self.vocab) + 1
@@ -114,6 +156,7 @@ class BPETokenizer(HindiTokenizer):
                     "vocab_size": len(self.vocab) + 1,
                     "learned_vocab_size": len(self.learned_vocab),
                     "compression_ratio": compression_ratio,
+                    "example_words": example_words if num_merges % 100 == 0 else [],
                 }
                 self.merge_history.append(merge_info)
                 self.training_progress["steps"].append(merge_info)
@@ -127,15 +170,61 @@ class BPETokenizer(HindiTokenizer):
                 num_merges += 1
                 pbar.update(1)
 
-                # Print progress every 100 merges
+                # Send real-time update
+                if manager and num_merges % 10 == 0:  # Send update every 10 merges
+                    update = {
+                        "type": "training_update",
+                        "data": {
+                            "step": num_merges,
+                            "new_token": new_token,
+                            "frequency": frequency,
+                            "vocab_size": len(self.vocab),
+                            "learned_vocab_size": len(self.learned_vocab),
+                            "compression_ratio": compression_ratio,
+                            "metrics": self.training_progress["metrics"],
+                        },
+                    }
+                    await manager.broadcast(update)
+
+                # Save checkpoint more frequently
                 if num_merges % 100 == 0:
-                    print(f"\nMerge {num_merges}:")
-                    print(f"New token: {new_token} (frequency: {frequency})")
-                    print(f"Vocabulary size: {len(self.vocab)}")
-                    print(f"Learned tokens: {len(self.learned_vocab)}")
-                    print(f"Compression ratio: {compression_ratio:.2f}")
+                    self._save_intermediate_vocab("bpe_model_latest.json")
+
+                # Track vocabulary growth
+                self.vocab_growth["tokens"].append(new_token)
+                self.vocab_growth["frequencies"].append(frequency)
+                self.vocab_growth["compositions"].append(list(best_pair[0]))
+                self.vocab_growth["merge_steps"].append(num_merges)
+                self.vocab_growth["timestamps"].append(time.time())
+
+        print("\nFinal Training Summary:")
+        print(f"Base vocabulary size: {len(self.BASE_VOCAB)}")
+        print(f"Learned vocabulary size: {len(self.learned_vocab)}")
+        print(f"Total vocabulary size: {len(self.vocab)}")
+        print(f"Total merge operations: {len(self.merge_history)}")
+        print(f"Final compression ratio: {compression_ratio:.2f}")
 
         return self.training_progress
+
+    def _save_intermediate_vocab(self, filename: str):
+        """Save intermediate vocabulary during training"""
+        checkpoint_data = {
+            "vocab": list(self.vocab),
+            "learned_vocab": list(self.learned_vocab),
+            "merges": {" ".join(k): v for k, v in self.merges.items()},
+            "merge_history": self.merge_history,
+            "base_vocab_stats": self.base_vocab_stats,
+            "training_stats": {
+                "total_merges": len(self.merge_history),
+                "vocab_size": len(self.vocab),
+                "learned_vocab_size": len(self.learned_vocab),
+            },
+        }
+
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(checkpoint_data, f, ensure_ascii=False, indent=2)
+
+        print(f"\nSaved checkpoint to {filename}")
 
     def tokenize_with_details(self, text: str) -> Dict:
         """Tokenize text and provide detailed analysis"""

@@ -1,0 +1,51 @@
+.training-control {
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.control-grid {
+    display: grid;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.control-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.control-item label {
+    font-size: 14px;
+    color: #666;
+}
+
+.control-item input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.start-button {
+    padding: 10px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.start-button:hover:not(:disabled) {
+    background: #45a049;
+}
+
+.start-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+} 

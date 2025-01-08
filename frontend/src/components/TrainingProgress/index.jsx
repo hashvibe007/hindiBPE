@@ -5,9 +5,41 @@ import './styles.css';
 const TrainingProgress = () => {
     const [progress, setProgress] = useState(null);
     const [selectedMetric, setSelectedMetric] = useState('compression_ratios');
+    const [ws, setWs] = useState(null);
 
     useEffect(() => {
+        // Initial fetch
         fetchTrainingProgress();
+
+        // Set up WebSocket connection
+        const websocket = new WebSocket('ws://localhost:8000/ws');
+        
+        websocket.onmessage = (event) => {
+            const update = JSON.parse(event.data);
+            if (update.type === 'training_update') {
+                setProgress(prevProgress => ({
+                    ...prevProgress,
+                    ...update.data
+                }));
+            }
+        };
+
+        setWs(websocket);
+
+        return () => {
+            if (websocket) {
+                websocket.close();
+            }
+        };
+    }, []);
+
+    // Add auto-refresh for polling updates
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchTrainingProgress();
+        }, 5000);  // Poll every 5 seconds
+
+        return () => clearInterval(interval);
     }, []);
 
     const fetchTrainingProgress = async () => {
@@ -80,6 +112,24 @@ const TrainingProgress = () => {
             )}
         </div>
     );
+
+    const TrainingStatus = ({ progress }) => {
+        if (!progress) return null;
+
+        const isTraining = progress.steps?.length < progress.target_vocab_size;
+        
+        return (
+            <div className={`training-status ${isTraining ? 'active' : ''}`}>
+                <div className="status-indicator"></div>
+                <span>
+                    {isTraining ? 'Training in Progress' : 'Training Complete'}
+                </span>
+                <div className="progress-details">
+                    <span>{progress.steps?.length || 0} / {progress.target_vocab_size}</span>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="training-progress">
