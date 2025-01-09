@@ -6,7 +6,7 @@ import os
 from tqdm import tqdm
 
 
-def download_hindi_wikipedia_content(num_articles=500, sentences_per_article=10):
+def download_hindi_wikipedia_content(num_articles=50000, sentences_per_article=10):
     """Download Hindi articles from Wikipedia"""
 
     # Hindi Wikipedia API endpoint
@@ -23,44 +23,55 @@ def download_hindi_wikipedia_content(num_articles=500, sentences_per_article=10)
         "rnnamespace": 0,  # Main namespace
     }
 
-    # Get random article titles
-    response = requests.get(api_url, params=params)
-    articles = response.json()["query"]["random"]
-
     collected_sentences = []
+    batch_size = 500  # Wikipedia API limit for `rnlimit`
+    total_batches = (
+        num_articles + batch_size - 1
+    ) // batch_size  # Calculate total batches
 
-    for article in tqdm(articles, desc="Processing articles"):
-        # Get article content
-        params = {
-            "action": "parse",
-            "format": "json",
-            "page": article["title"],
-            "prop": "text",
-        }
+    for batch in range(total_batches):
+        # Adjust the number of articles for the last batch
+        current_batch_size = min(batch_size, num_articles - len(collected_sentences))
+        params["rnlimit"] = current_batch_size
 
-        try:
-            response = requests.get(api_url, params=params)
-            content = response.json()["parse"]["text"]["*"]
+        # Get random article titles
+        response = requests.get(api_url, params=params)
+        articles = response.json().get("query", {}).get("random", [])
 
-            # Parse HTML content
-            soup = BeautifulSoup(content, "html.parser")
-            text = soup.get_text()
+        for article in tqdm(
+            articles, desc=f"Processing batch {batch + 1}/{total_batches}"
+        ):
+            # Get article content
+            params = {
+                "action": "parse",
+                "format": "json",
+                "page": article["title"],
+                "prop": "text",
+            }
 
-            # Clean text
-            text = clean_text(text)
+            try:
+                response = requests.get(api_url, params=params)
+                content = response.json()["parse"]["text"]["*"]
 
-            # Split into sentences (basic splitting by ।, ?, !)
-            sentences = re.split("[।?!]", text)
-            sentences = [
-                s.strip() for s in sentences if len(s.strip()) > 20
-            ]  # Min length filter
+                # Parse HTML content
+                soup = BeautifulSoup(content, "html.parser")
+                text = soup.get_text()
 
-            # Add top sentences from this article
-            collected_sentences.extend(sentences[:sentences_per_article])
+                # Clean text
+                text = clean_text(text)
 
-        except Exception as e:
-            print(f"Error processing article {article['title']}: {str(e)}")
-            continue
+                # Split into sentences (basic splitting by ।, ?, !)
+                sentences = re.split("[।?!]", text)
+                sentences = [
+                    s.strip() for s in sentences if len(s.strip()) > 20
+                ]  # Min length filter
+
+                # Add top sentences from this article
+                collected_sentences.extend(sentences[:sentences_per_article])
+
+            except Exception as e:
+                print(f"Error processing article {article['title']}: {str(e)}")
+                continue
 
     return collected_sentences
 
@@ -101,7 +112,7 @@ def main():
 
     print("Downloading Hindi text data...")
     sentences = download_hindi_wikipedia_content(
-        num_articles=500, sentences_per_article=20
+        num_articles=10000, sentences_per_article=20
     )
 
     # Save raw sentences

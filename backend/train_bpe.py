@@ -2,6 +2,9 @@ import asyncio
 from app.bpe_tokenizer import BPETokenizer
 import json
 from tqdm import tqdm
+from app.dynamic_vocabulary_manager import DynamicVocabularyManager
+from app.token_frequency_tracker import TokenFrequencyTracker
+from app.feedback_loop import FeedbackLoop
 
 
 def load_sample_data(file_path: str, max_sentences: int = None) -> str:
@@ -31,13 +34,20 @@ def load_sample_data(file_path: str, max_sentences: int = None) -> str:
     return "\n".join(sentences)
 
 
-async def train_and_save_bpe(text: str, vocab_size: int = 5000, manager=None):
+async def train_and_save_bpe(text: str, vocab_size: int = 5000):
     tokenizer = BPETokenizer(vocab_size=vocab_size)
+    frequency_tracker = TokenFrequencyTracker()
+    vocab_manager = DynamicVocabularyManager(initial_vocabulary=tokenizer.vocab)
+    feedback_loop = FeedbackLoop(target_compression_ratio=1.5)
+
     print("\nInitializing vocabulary...")
     tokenizer.initialize_vocab()
 
     print("\nStarting BPE training...")
-    await tokenizer.learn_bpe(text, manager=manager)
+    await tokenizer.learn_bpe(text, manager=vocab_manager)
+
+    # Integrate feedback loop
+    feedback_loop.evaluate_and_adjust(tokenizer)
 
     # Save final model
     model_data = {
@@ -63,7 +73,7 @@ async def main():
     text = load_sample_data("data/hindi_wiki_corpus.txt", max_sentences=10000)
 
     # Train BPE with larger vocabulary
-    tokenizer = await train_and_save_bpe(text, vocab_size=10000, manager=None)
+    tokenizer = await train_and_save_bpe(text, vocab_size=10000)
 
     # Show sample tokenization
     print("\nSample Tokenization:")

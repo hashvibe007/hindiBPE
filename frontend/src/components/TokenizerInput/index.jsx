@@ -38,14 +38,18 @@ const TokenizerInput = () => {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to tokenize text');
+                throw new Error(errorData.message || 'Tokenization failed');
             }
 
             const data = await response.json();
+            console.log('Tokenization Data:', data);  // Debug log
+            console.log('Original Tokens:', data.original_tokens);
+            console.log('Encoded Tokens:', data.original_encoded_tokens);
+            console.log('BPE Tokens:', data.bpe_tokens);
+            console.log('Token Numbers:', data.token_numbers);
             setTokenData(data);
         } catch (error) {
             setError(error.message);
-            console.error('Error tokenizing text:', error);
         } finally {
             setIsLoading(false);
         }
@@ -160,7 +164,8 @@ const TokenizerInput = () => {
                                     onClick={() => setSelectedToken(selectedToken === index ? null : index)}
                                 >
                                     <span className="token-text">{token.token}</span>
-                                    {selectedToken === index && (
+                                    <span className="token-number">{tokenData.token_numbers[index]}</span>
+                                    {selectedToken === index && tokenData.token_numbers && tokenData.token_numbers.length > index && (
                                         <div className="token-popup">
                                             <div>Length: {token.length}</div>
                                             <div>Type: {token.type}</div>
@@ -188,6 +193,33 @@ const TokenizerInput = () => {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {tokenData && tokenData.original_tokens && tokenData.original_encoded_tokens && tokenData.bpe_tokens && tokenData.token_numbers &&
+                    tokenData.original_tokens.length === tokenData.original_encoded_tokens.length &&
+                    tokenData.original_tokens.length === tokenData.bpe_tokens.length &&
+                    tokenData.original_tokens.length === tokenData.token_numbers.length && (
+                    <div className="token-comparison">
+                        <h2>Token Comparison</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Original Token</th>
+                                    <th>Encoded Token</th>
+                                    <th>BPE Token</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tokenData.original_tokens.map((token, index) => (
+                                    <tr key={index}>
+                                        <td>{token}</td>
+                                        <td>{Array.from(tokenData.original_encoded_tokens[index] || []).join(' ')}</td>
+                                        <td>{tokenData.bpe_tokens[index]}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>

@@ -5,7 +5,9 @@ from typing import List, Dict
 from app.bpe_tokenizer import BPETokenizer
 import os
 import asyncio
+import logging
 
+logging.basicConfig(level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s")
 app = FastAPI(title="Hindi BPE Tokenizer API")
 
 # Configure CORS
@@ -79,13 +81,15 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.post("/tokenize")
 async def tokenize_text(request: TokenizeRequest):
-    try:
+    # try:
         result = tokenizer.tokenize_with_details(request.text)
         # Ensure all required fields are present
         return {
             "original_text": result["original_text"],
             "original_tokens": result["original_tokens"],
             "bpe_tokens": result["bpe_tokens"],
+            "original_encoded_tokens": result["original_encoded_tokens"],
+            "token_numbers": result["token_numbers"],
             "stats": {
                 "original_chars": result["stats"]["original_chars"],
                 "token_count": len(result["bpe_tokens"]),
@@ -104,8 +108,8 @@ async def tokenize_text(request: TokenizeRequest):
             if tokenizer.merge_history
             else [],
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/vocabulary-stats")

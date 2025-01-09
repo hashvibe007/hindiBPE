@@ -5,6 +5,13 @@ from .hindi_tokenizer import HindiTokenizer  # Import the base class
 from tqdm import tqdm
 import os
 import time
+import re
+from app.adaptive_bpe import AdaptiveBPE
+import logging
+
+logging.basicConfig(
+    level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 class BPETokenizer(HindiTokenizer):
@@ -83,8 +90,8 @@ class BPETokenizer(HindiTokenizer):
         print(f"Starting with {len(word_freqs)} unique words")
         print(f"Total characters: {original_char_count}")
         print("\nVocabulary composition:")
-        for key, value in self.base_vocab_stats.items():
-            print(f"  {key}: {value}")
+        # for key, value in self.base_vocab_stats.items():
+            # print(f"  {key}: {value}")
 
         with tqdm(
             total=self.vocab_size - initial_vocab_size, desc="Learning merges"
@@ -170,22 +177,6 @@ class BPETokenizer(HindiTokenizer):
                 num_merges += 1
                 pbar.update(1)
 
-                # Send real-time update
-                if manager and num_merges % 10 == 0:  # Send update every 10 merges
-                    update = {
-                        "type": "training_update",
-                        "data": {
-                            "step": num_merges,
-                            "new_token": new_token,
-                            "frequency": frequency,
-                            "vocab_size": len(self.vocab),
-                            "learned_vocab_size": len(self.learned_vocab),
-                            "compression_ratio": compression_ratio,
-                            "metrics": self.training_progress["metrics"],
-                        },
-                    }
-                    await manager.broadcast(update)
-
                 # Save checkpoint more frequently
                 if num_merges % 100 == 0:
                     self._save_intermediate_vocab("bpe_model_latest.json")
@@ -196,6 +187,46 @@ class BPETokenizer(HindiTokenizer):
                 self.vocab_growth["compositions"].append(list(best_pair[0]))
                 self.vocab_growth["merge_steps"].append(num_merges)
                 self.vocab_growth["timestamps"].append(time.time())
+
+                # Adaptive BPE: Review and adjust merge operations based on token frequency
+                if num_merges % 50 == 0:  # Review every 50 merges
+                    print("\nReviewing vocabulary...")
+                    # Example logic: prioritize tokens with higher frequency
+                    frequent_tokens = [
+                        token for token, freq in self.token_usage.items() if freq > 5
+                    ]
+                    print(f"Frequent tokens: {frequent_tokens}")
+
+                    # Adjust merges based on frequency using AdaptiveBPE
+                    adaptive_bpe = AdaptiveBPE(self.merges)
+                    adaptive_bpe.perform_merges(self.token_usage)
+                    self.merges = adaptive_bpe.get_merges()
+
+                    # Update vocabulary with frequent tokens
+                    for token in frequent_tokens:
+                        if token not in self.vocab:
+                            self.vocab.add(token)
+                            print(f"Added {token} to vocabulary based on frequency.")
+
+                    # Save updated model
+                    self._save_intermediate_vocab("bpe_model_latest.json")
+
+                # Track token frequency for Devanagari tokens only
+                devanagari_pattern = re.compile(r"[\u0900-\u097F]+")
+                devanagari_tokens = [
+                    token
+                    for token in current_tokens
+                    if devanagari_pattern.fullmatch(token)
+                ]
+                self.token_usage.update(devanagari_tokens)
+
+                # Save token frequencies periodically
+                if num_merges % 100 == 0:
+                    self.save_token_frequencies("token_frequencies.json")
+
+                # Update vocabulary based on token frequencies and threshold
+                if num_merges % 100 == 0:
+                    self.update_vocabulary_based_on_frequency(threshold=5)
 
         print("\nFinal Training Summary:")
         print(f"Base vocabulary size: {len(self.BASE_VOCAB)}")
@@ -226,6 +257,25 @@ class BPETokenizer(HindiTokenizer):
 
         print(f"\nSaved checkpoint to {filename}")
 
+    def assign_token_numbers(self):
+        """Assign unique numbers to each token in the vocabulary"""
+        # Assign numbers to base vocabulary
+        self.token_numbers = {token: i + 1 for i, token in enumerate(self.BASE_VOCAB)}
+        logging.info("Base vocabulary token numbers: %s", self.token_numbers)
+
+        # Assign incremental numbers to the rest of the vocabulary
+        current_number = len(self.BASE_VOCAB) + 1
+        for token in sorted(self.vocab - self.BASE_VOCAB):
+            self.token_numbers[token] = current_number
+            current_number += 1
+
+        # Ensure all tokens in the vocabulary are numbered
+        for token in self.vocab:
+            if token not in self.token_numbers:
+                self.token_numbers[token] = current_number
+                current_number += 1
+        logging.info("Complete token numbers: %s", self.token_numbers)
+
     def tokenize_with_details(self, text: str) -> Dict:
         """Tokenize text and provide detailed analysis"""
         original_tokens = self.tokenize(text)  # Character-level tokenization
@@ -234,17 +284,39 @@ class BPETokenizer(HindiTokenizer):
         # Update token usage statistics
         self.token_usage.update(bpe_tokens)
 
+        # Calculate original character count as byte length
+        original_char_count = len(list(map(int, text.encode("utf-8"))))
+
+        # Encode BPE tokens individually
+        bpe_encoded_tokens = [
+            list(map(int, token.encode("utf-8"))) for token in bpe_tokens
+        ]
+
+        # Encode original tokens individually
+        original_encoded_tokens = [
+            list(map(int, token.encode("utf-8"))) for token in original_tokens
+        ]
+        bpe_char_count = len(original_encoded_tokens)
+
+        # Assign token numbers
+        self.assign_token_numbers()
+
         return {
             "original_text": text,
             "original_tokens": original_tokens,
+            "original_encoded_tokens": original_encoded_tokens,  # Ensure this is included
             "bpe_tokens": bpe_tokens,
+            "bpe_encoded_tokens": bpe_encoded_tokens,
+            "token_numbers": [
+                self.token_numbers.get(token, -1) for token in bpe_tokens
+            ],
             "stats": {
-                "original_chars": len(text.replace(" ", "")),
-                "original_token_count": len(original_tokens),
-                "bpe_token_count": len(bpe_tokens),
-                "compression_ratio": round(
-                    len(text.replace(" ", "")) / len(bpe_tokens), 2
-                ),
+                "original_chars": original_char_count,
+                "original_token_count": original_char_count,
+                "bpe_token_count": bpe_char_count,
+                "compression_ratio": round(original_char_count / bpe_char_count, 2)
+                if bpe_char_count > 0
+                else 0,
                 "unique_tokens": len(set(bpe_tokens)),
             },
             "token_details": [
@@ -260,13 +332,20 @@ class BPETokenizer(HindiTokenizer):
 
     def _get_word_frequencies(self, text: str) -> Dict[str, int]:
         """Get word frequencies from text with proper character-level splitting"""
+        # Define a regex pattern to match only Devanagari characters
+        devanagari_pattern = re.compile(r"[\u0900-\u097F]+")
+
+        # Split text into words and filter out non-Devanagari words
         words = text.split()
+        filtered_words = [word for word in words if devanagari_pattern.fullmatch(word)]
+
         # Split each word into space-separated characters for BPE
         word_freqs = Counter()
-        for word in words:
+        for word in filtered_words:
             # Convert word to space-separated characters
             char_seq = " ".join(list(word))
             word_freqs[char_seq] += 1
+
         return word_freqs
 
     def _apply_merge(
@@ -292,8 +371,16 @@ class BPETokenizer(HindiTokenizer):
         result = []
 
         for word in words:
+            # print(f"Processing word: {word}")  # Debug statement
+            # Check if the word is already in the vocabulary
+            if word in self.vocab:
+                # print(f"Word '{word}' is in the vocabulary.")  # Debug statement
+                result.append(word)
+                continue
+
             # Start with character-level tokens
             word_tokens = " ".join(list(word))  # Space-separated characters
+            # print(f"Initial tokens: {word_tokens}")  # Debug statement
 
             # Apply merges iteratively
             while True:
@@ -302,6 +389,16 @@ class BPETokenizer(HindiTokenizer):
                     (pair[0], pair[1])
                     for pair in zip(word_tokens.split()[:-1], word_tokens.split()[1:])
                 ]
+                # print(f"Possible pairs: {pairs}")  # Debug statement
+
+                # Check if any split tokens are in the vocabulary
+                split_tokens = word_tokens.split()
+                if all(token in self.vocab for token in split_tokens):
+                    # print(
+                    #     f"All split tokens are in the vocabulary: {split_tokens}"
+                    # )  # Debug statement
+                    result.extend(split_tokens)
+                    break
 
                 # Find first applicable merge
                 for pair in pairs:
@@ -309,6 +406,9 @@ class BPETokenizer(HindiTokenizer):
                         new_token = self.merges[pair]
                         bigram = " ".join(pair)
                         word_tokens = word_tokens.replace(bigram, new_token)
+                        # print(
+                        #     f"Applied merge: {pair} -> {new_token}"
+                        # )  # Debug statement
                         break
                 else:
                     # No more merges possible
@@ -316,6 +416,9 @@ class BPETokenizer(HindiTokenizer):
 
             # Add final tokens
             result.extend(word_tokens.split())
+            # print(
+            #     f"Final tokens for word '{word}': {word_tokens.split()}"
+            # )  # Debug statement
 
         return result
 
@@ -366,3 +469,74 @@ class BPETokenizer(HindiTokenizer):
         except Exception as e:
             print(f"Error loading model: {str(e)}")
             return False
+
+    def save_token_frequencies(self, filename: str):
+        """Save token frequencies to a JSON file"""
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(self.token_usage, f, ensure_ascii=False, indent=2)
+        print(f"Token frequencies saved to {filename}")
+
+    def update_vocabulary_based_on_frequency(self, threshold: int):
+        """Update vocabulary based on token frequencies and a defined threshold"""
+        # Load token frequencies from JSON file
+        with open("token_frequencies.json", "r", encoding="utf-8") as f:
+            token_frequencies = json.load(f)
+
+        # Sort tokens by frequency
+        sorted_tokens = sorted(
+            token_frequencies.items(), key=lambda x: x[1], reverse=True
+        )
+
+        # Update vocabulary based on threshold
+        for token, freq in sorted_tokens:
+            if freq >= threshold:
+                if token not in self.vocab:
+                    self.vocab.add(token)
+                    print(f"Added {token} to vocabulary based on frequency {freq}.")
+
+        # Save updated model
+        self._save_intermediate_vocab("bpe_model_latest.json")
+
+    def update_bpe_model_from_frequencies(self, threshold: int):
+        """One-time update of BPE model using token frequencies"""
+        # Load token frequencies from JSON file
+        with open("token_frequencies.json", "r", encoding="utf-8") as f:
+            token_frequencies = json.load(f)
+
+        # Sort tokens by frequency in descending order
+        sorted_tokens = sorted(
+            token_frequencies.items(), key=lambda x: x[1], reverse=True
+        )
+
+        # Clear existing vocabulary
+        updated_vocab = set()
+
+        # Update vocabulary based on top 5000 most frequent tokens, skipping base vocabulary
+        top_tokens = [
+            token for token, freq in sorted_tokens if token not in self.BASE_VOCAB
+        ][:5000]
+        for token in top_tokens:
+            updated_vocab.add(token)
+            print(f"Added {token} to vocabulary based on frequency.")
+
+        # Save updated model
+        model_data = {
+            "vocab": list(updated_vocab),
+            "merges": {},  # Clear merges as well
+            "merge_history": [],
+            "base_vocab_stats": {},
+            "training_stats": {
+                "total_merges": 0,
+                "vocab_size": len(updated_vocab),
+                "learned_vocab_size": 0,
+            },
+        }
+        with open("bpe_model_latest.json", "w", encoding="utf-8") as f:
+            json.dump(model_data, f, ensure_ascii=False, indent=2)
+        print("Updated BPE model saved to bpe_model_latest.json")
+
+        # Save sorted token frequencies back to JSON file
+        sorted_token_frequencies = {token: freq for token, freq in sorted_tokens}
+        with open("token_frequencies.json", "w", encoding="utf-8") as f:
+            json.dump(sorted_token_frequencies, f, ensure_ascii=False, indent=2)
+        print("Sorted token frequencies saved to token_frequencies.json")
