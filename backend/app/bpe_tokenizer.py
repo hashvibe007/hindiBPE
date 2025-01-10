@@ -91,7 +91,7 @@ class BPETokenizer(HindiTokenizer):
         print(f"Total characters: {original_char_count}")
         print("\nVocabulary composition:")
         # for key, value in self.base_vocab_stats.items():
-            # print(f"  {key}: {value}")
+        # print(f"  {key}: {value}")
 
         with tqdm(
             total=self.vocab_size - initial_vocab_size, desc="Learning merges"
@@ -301,6 +301,13 @@ class BPETokenizer(HindiTokenizer):
         # Assign token numbers
         self.assign_token_numbers()
 
+        # Calculate compression ratio correctly
+        compression_ratio = (
+            round(original_char_count / len(bpe_tokens), 2)
+            if len(bpe_tokens) > 0
+            else 0
+        )
+
         return {
             "original_text": text,
             "original_tokens": original_tokens,
@@ -314,9 +321,7 @@ class BPETokenizer(HindiTokenizer):
                 "original_chars": original_char_count,
                 "original_token_count": original_char_count,
                 "bpe_token_count": bpe_char_count,
-                "compression_ratio": round(original_char_count / bpe_char_count, 2)
-                if bpe_char_count > 0
-                else 0,
+                "compression_ratio": compression_ratio,
                 "unique_tokens": len(set(bpe_tokens)),
             },
             "token_details": [
