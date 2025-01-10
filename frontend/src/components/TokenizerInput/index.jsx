@@ -27,7 +27,7 @@ const TokenizerInput = () => {
             setError(null);
             setSelectedToken(null);
             
-            const response = await fetch('http://0.0.0.0:8000/tokenize', {
+            const response = await fetch('http://localhost:8000/tokenize', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
