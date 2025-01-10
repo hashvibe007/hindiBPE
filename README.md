@@ -16,6 +16,8 @@ The tokenizer starts with a base vocabulary consisting of:
   - Chandrabindu (चन्द्रबिन्दु): ँ
   - Nukta (नुक्ता): ़
 
+### Learned Vocabulary
+Refer to `backend/bpe_model_latest.json` & `backend/token_frequencies.json`
 ### 2. BPE Training Process
 
 #### 2.1 Data Preparation
@@ -62,7 +64,8 @@ The tokenizer starts with a base vocabulary consisting of:
    - Finds most frequent adjacent character pairs
    - Merges them into a new token
    - Updates vocabulary and frequency counts
-   - Tracks merge history and statistics
+   - keep a track of all trained merges in merge_history
+   - in regular interval revisit the vocabulary and update with the top 5000 from the tracked merges
 
 ### 3. Tokenization Process
 
@@ -180,3 +183,12 @@ print(result['bpe_tokens'])
    - Add more detailed token statistics
    - Improve visualization of merge patterns
    - Add model comparison tools
+
+
+### UI for the tokenizer
+- Take content from any place with pure hindi articles.
+- Tokenize the content
+- it will show the original text, original tokens, bpe tokens, original encoded tokens, token numbers, stats, token details
+
+UI Screenshot:
+![UI Screenshot](screenshot/HindiBPE.png)
