@@ -12,6 +12,9 @@ RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
+# Install serve globally to serve the React app
+RUN npm install -g serve
+
 # Stage 2: Build FastAPI backend
 FROM python:3.8-slim as backend-builder
 
@@ -39,4 +42,4 @@ EXPOSE 7860
 EXPOSE 8000
 
 # Start both frontend and backend
-CMD ["sh", "-c", "cd /app/backend && uvicorn main:app --host 0.0.0.0 --port 8000 & cd /app/frontend/build && serve -s -l 7860"]
+CMD ["sh", "-c", "cd /app/backend && uvicorn main:app --host 0.0.0.0 --port 8000 & serve -s /app/frontend/build -l 7860"]

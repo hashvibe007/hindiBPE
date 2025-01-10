@@ -1,5 +1,5 @@
 fastapi==0.68.1
-uvicorn==0.15.0
+uvicorn
 requests==2.26.0
 beautifulsoup4==4.9.3
 wikitextparser==0.47.5
