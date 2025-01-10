@@ -17,6 +17,9 @@ FROM python:3.8-slim as backend-builder
 
 WORKDIR /app/backend
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y gcc libpq-dev
+
 # Copy backend code
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
