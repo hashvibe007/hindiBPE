@@ -35,7 +35,7 @@ FROM python:3.8-slim
 WORKDIR /app
 
 # Install serve globally to serve the React app
-RUN pip install uvicorn fastapi && apt-get update && apt-get install -y nodejs npm && npm install -g serve
+RUN pip install uvicorn fastapi tqdm wikitextparser pydantic requests beautifulsoup4 && apt-get update && apt-get install -y nodejs npm && npm install -g serve
 
 # Copy built frontend from the first stage
 COPY --from=frontend-builder /app/frontend/build /app/frontend/build
