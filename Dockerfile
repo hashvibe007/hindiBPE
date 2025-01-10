@@ -37,6 +37,12 @@ WORKDIR /app
 # Install serve globally to serve the React app
 RUN pip install uvicorn fastapi tqdm wikitextparser pydantic requests beautifulsoup4 && apt-get update && apt-get install -y nodejs npm && npm install -g serve
 
+# Install supervisord
+RUN apt-get install -y supervisor
+
+# Copy supervisord configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
 # Copy built frontend from the first stage
 COPY --from=frontend-builder /app/frontend/build /app/frontend/build
 
@@ -47,5 +53,5 @@ COPY --from=backend-builder /app/backend /app/backend
 EXPOSE 7860
 EXPOSE 8000
 
-# Start both frontend and backend
-CMD ["sh", "-c", "cd /app/backend && uvicorn main:app --host 0.0.0.0 --port 8000 & serve -s /app/frontend/build -l 7860"]
+# Start supervisord
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

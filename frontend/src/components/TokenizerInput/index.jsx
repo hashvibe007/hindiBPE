@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import './styles.css';
-import TrainingProgress from '../TrainingProgress';
 import VocabularyGrowth from '../VocabularyGrowth';
 
 const TokenizerInput = () => {
@@ -28,7 +27,7 @@ const TokenizerInput = () => {
             setError(null);
             setSelectedToken(null);
             
-            const response = await fetch('http://localhost:8000/tokenize', {
+            const response = await fetch('http://0.0.0.0:8000/tokenize', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -97,7 +96,6 @@ const TokenizerInput = () => {
     return (
         <div className="app-container">
             <div className="training-section">
-                <TrainingProgress />
                 {trainingStats && trainingStats.vocab_growth && (
                     <VocabularyGrowth vocabGrowth={trainingStats.vocab_growth} />
                 )}
