@@ -12,9 +12,6 @@ RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
-# Install serve globally to serve the React app
-RUN npm install -g serve
-
 # Stage 2: Build FastAPI backend
 FROM python:3.8-slim as backend-builder
 
@@ -30,6 +27,9 @@ COPY backend/ ./
 FROM python:3.8-slim
 
 WORKDIR /app
+
+# Install serve globally to serve the React app
+RUN pip install uvicorn && apt-get update && apt-get install -y nodejs npm && npm install -g serve
 
 # Copy built frontend from the first stage
 COPY --from=frontend-builder /app/frontend/build /app/frontend/build
