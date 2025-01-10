@@ -191,4 +191,4 @@ print(result['bpe_tokens'])
 - it will show the original text, original tokens, bpe tokens, original encoded tokens, token numbers, stats, token details
 
 UI Screenshot:
-![UI Screenshot](screenshot/HindiBPE.png)
+![UI Screenshot](screenshots/HindiBPE.png)
