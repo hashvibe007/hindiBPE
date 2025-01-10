@@ -1,7 +1,7 @@
-fastapi==0.68.1
+fastapi
 uvicorn
-requests==2.26.0
-beautifulsoup4==4.9.3
-wikitextparser==0.47.5
-tqdm==4.62.2
-pydantic==1.8.2 
+requests
+beautifulsoup4
+wikitextparser
+tqdm
+pydantic

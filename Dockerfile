@@ -1,7 +1,5 @@
-# Use a multi-stage build to optimize the image size
-
 # Stage 1: Build React frontend
-FROM node:14 as frontend-builder
+FROM node:14 AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -13,7 +11,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build FastAPI backend
-FROM python:3.8-slim as backend-builder
+FROM python:3.8-slim AS backend-builder
 
 WORKDIR /app/backend
 
@@ -22,7 +20,12 @@ RUN apt-get update && apt-get install -y gcc libpq-dev
 
 # Copy backend code
 COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Debugging: List contents to verify requirements.txt is present
+RUN ls -la
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r ./requirements.txt && pip freeze
 
 COPY backend/ ./
 
