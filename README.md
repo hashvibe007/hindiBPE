@@ -1,3 +1,15 @@
+---
+title: Hindi BPE Tokenizer
+emoji: 🐋
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_file: dockerfile
+pinned: false
+---
+
+
+
 # Hindi Byte Pair Encoding (BPE) Implementation
 
 This project implements Byte Pair Encoding (BPE) for Hindi text tokenization. The implementation includes both character-level and subword tokenization with a focus on handling Hindi script's unique characteristics.
